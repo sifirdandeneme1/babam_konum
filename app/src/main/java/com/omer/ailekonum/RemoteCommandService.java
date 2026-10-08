@@ -30,7 +30,7 @@ public class RemoteCommandService extends Service {
     public void onCreate() {
         super.onCreate();
         prefs = getSharedPreferences("prefs", MODE_PRIVATE);
-        executor = Executors.newSingleThreadExecutor();
+        executor = Executors.newFixedThreadPool(2);
         createChannel();
         startForeground(NOTIFICATION_ID, notification("Uzaktan komut bekleniyor"));
     }
