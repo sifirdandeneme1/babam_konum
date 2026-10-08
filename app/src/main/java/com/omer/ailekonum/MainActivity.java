@@ -226,6 +226,17 @@ public class MainActivity extends Activity {
         pairNote.setTextSize(13);
         root.addView(pairNote);
 
+        TextView pairStatus = body("Eşleştirme paketi hazırlanıyor…");
+        pairStatus.setTextSize(13);
+        root.addView(pairStatus);
+
+        Button resendPair = button("Eşleştirme kodunu şimdi gönder");
+        resendPair.setOnClickListener(v -> {
+            pairStatus.setText("Gönderiliyor…");
+            publishPairingOffer();
+        });
+        root.addView(resendPair);
+
         TextView status = body("");
         status.setTextSize(15);
         root.addView(status);
@@ -269,6 +280,8 @@ public class MainActivity extends Activity {
                 boolean loc = SystemLocationController.isEnabled(MainActivity.this);
                 boolean tracking = prefs.getBoolean("tracking", false);
                 String error = prefs.getString("tracking_error", "");
+                String pairState = prefs.getString("pair_publish_status", "Henüz gönderim sonucu yok.");
+                pairStatus.setText("Eşleştirme: " + pairState);
 
                 StringBuilder s = new StringBuilder();
                 s.append(secure ? "✅ ADB özel yetkisi hazır" : "❌ ADB özel yetkisi henüz verilmedi");
@@ -325,7 +338,13 @@ public class MainActivity extends Activity {
 
                 String encrypted = CryptoUtil.encryptWithPin(pin, bucket, obj.toString());
                 NtfyClient.post(CryptoUtil.pairingTopic(pin, bucket), encrypted);
-            } catch (Exception ignored) {
+                prefs.edit().putString(
+                        "pair_publish_status",
+                        "✅ Sunucuya gönderildi • " + new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date())
+                ).apply();
+            } catch (Exception e) {
+                String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                prefs.edit().putString("pair_publish_status", "❌ Gönderilemedi: " + msg).apply();
             }
         });
     }
@@ -427,13 +446,13 @@ public class MainActivity extends Activity {
             pair.setEnabled(false);
             state.setText("Eşleştirme aranıyor…");
             io.execute(() -> {
-                String found = findPairingSecret(p);
+                PairingResult result = findPairingSecret(p);
                 runOnUiThread(() -> {
                     pair.setEnabled(true);
-                    if (found == null || found.isEmpty()) {
-                        state.setText("Kod bulunamadı. Babanın telefonunda Aile Konum ekranı açık olsun ve tekrar dene.");
+                    if (result.secret == null || result.secret.isEmpty()) {
+                        state.setText(result.message);
                     } else {
-                        prefs.edit().putString("master_secret", found).apply();
+                        prefs.edit().putString("master_secret", result.secret).apply();
                         toast("Eşleşme tamamlandı.");
                         showCurrentMode();
                     }
@@ -449,14 +468,28 @@ public class MainActivity extends Activity {
         setContentView(root);
     }
 
-    private String findPairingSecret(String pin) {
+    private static final class PairingResult {
+        final String secret;
+        final String message;
+
+        PairingResult(String secret, String message) {
+            this.secret = secret;
+            this.message = message;
+        }
+    }
+
+    private PairingResult findPairingSecret(String pin) {
         long now = System.currentTimeMillis();
         long current = CryptoUtil.pairingBucket();
+        StringBuilder diagnostic = new StringBuilder();
+        int totalMessages = 0;
+        int decryptFailures = 0;
 
-        for (long bucket : new long[]{current, current - 1}) {
+        for (long bucket : new long[]{current, current - 1, current + 1, current - 2, current + 2}) {
             try {
                 String topic = CryptoUtil.pairingTopic(pin, bucket);
                 List<String> messages = NtfyClient.pollRaw(topic, "10m");
+                totalMessages += messages.size();
 
                 for (int i = messages.size() - 1; i >= 0; i--) {
                     try {
@@ -465,17 +498,31 @@ public class MainActivity extends Activity {
                         long created = obj.optLong("created", 0L);
                         long expires = obj.optLong("expires", 0L);
                         String secret = obj.optString("secret", "");
-                        if (created > 0L && expires >= now && now - created <= 10L * 60L * 1000L
+                        if (created > 0L && expires >= now && Math.abs(now - created) <= 10L * 60L * 1000L
                                 && !secret.isEmpty()) {
-                            return secret;
+                            return new PairingResult(secret, "Eşleşme tamamlandı.");
                         }
-                    } catch (Exception ignored) {
+                    } catch (Exception e) {
+                        decryptFailures++;
                     }
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                if (diagnostic.length() > 0) diagnostic.append(" | ");
+                diagnostic.append(msg);
             }
         }
-        return null;
+
+        if (diagnostic.length() > 0) {
+            return new PairingResult("", "Sunucu bağlantı hatası: " + diagnostic);
+        }
+        if (totalMessages == 0) {
+            return new PairingResult("", "Sunucuda bu kod için mesaj yok. Babanın telefonunda 'Eşleştirme kodunu şimdi gönder' düğmesine basıp tekrar dene.");
+        }
+        if (decryptFailures > 0) {
+            return new PairingResult("", "Mesaj bulundu ama kod çözülemedi. İki telefonda da aynı yeni APK yüklü olmalı.");
+        }
+        return new PairingResult("", "Eşleştirme paketi bulundu ama süresi geçmiş görünüyor. Yeni kod oluşturup tekrar dene.");
     }
 
     private void sendCommand(String secret, String cmd) {
