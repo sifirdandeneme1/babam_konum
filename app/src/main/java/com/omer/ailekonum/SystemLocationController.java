@@ -32,20 +32,42 @@ public final class SystemLocationController {
 
     public static boolean setEnabled(Context context, boolean enabled) {
         if (!hasSecureSettings(context)) return false;
+
         try {
-            boolean wrote = Settings.Secure.putInt(
+            Settings.Secure.putInt(
                     context.getContentResolver(),
                     Settings.Secure.LOCATION_MODE,
                     enabled ? Settings.Secure.LOCATION_MODE_HIGH_ACCURACY : Settings.Secure.LOCATION_MODE_OFF
             );
-            try {
-                Thread.sleep(350L);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            return wrote && isEnabled(context) == enabled;
-        } catch (Exception e) {
-            return false;
+        } catch (Exception ignored) {
         }
+
+        if (isEnabled(context) != enabled) {
+            try {
+                Settings.Secure.setLocationProviderEnabled(
+                        context.getContentResolver(),
+                        LocationManager.GPS_PROVIDER,
+                        enabled
+                );
+            } catch (Exception ignored) {
+            }
+
+            try {
+                Settings.Secure.setLocationProviderEnabled(
+                        context.getContentResolver(),
+                        LocationManager.NETWORK_PROVIDER,
+                        enabled
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
+        try {
+            Thread.sleep(500L);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        return isEnabled(context) == enabled;
     }
 }
