@@ -37,6 +37,21 @@ jobs:
       - name: Compile APK
         working-directory: aile_konum_v2
         run: gradle --no-daemon --stacktrace assembleDebug
+      - name: Build unsigned release APK
+        working-directory: aile_konum_v2
+        run: gradle --no-daemon --stacktrace assembleRelease
+      - name: Prepare local signing toolkit
+        run: |
+          mkdir -p release-toolkit
+          cp aile_konum_v2/app/build/outputs/apk/release/app-release-unsigned.apk release-toolkit/
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" release-toolkit/
+      - name: Upload unsigned release and signer
+        uses: actions/upload-artifact@v4
+        with:
+          name: aile-konum2-unsigned-release-toolkit
+          path: release-toolkit/*
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload test APK
         uses: actions/upload-artifact@v4
         with:
