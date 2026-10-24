@@ -28,7 +28,7 @@ replace_once(
         locationText=text("Gerçek konum bekleniyor…",16);column.addView(locationText);'''
 )
 replace_once(
-    '''            statusText.setText((fresh?"● KONUM GÜNCEL":"⚠ KONUM ESKİ / BEKLENİYOR")+
+    r'''            statusText.setText((fresh?"● KONUM GÜNCEL":"⚠ KONUM ESKİ / BEKLENİYOR")+
                 "\nGönderen bağlantısı: "+(senderOnline?"BAĞLI":"BAĞLI DEĞİL")+''',
     '''            if(freshnessText!=null){
                 freshnessText.setText(fresh?"● KONUM GÜNCEL":lastGpsAt>0?"● KONUM ESKİ":"● KONUM BEKLENİYOR");
