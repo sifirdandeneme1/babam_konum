@@ -1,4 +1,4 @@
-name: Build Aile Konum 2.1 (Ses ve Renk)
+name: Build Aile Konum 2.1.1 (Ses ve Renk)
 on:
   push:
     branches:
@@ -25,7 +25,9 @@ jobs:
         run: |
           grep -q 'class SoundControl' aile_konum_v2/app/src/main/java/com/omer/ailekonum2/SoundControl.java
           grep -q 'freshnessText.setTextColor(fresh?' aile_konum_v2/app/src/main/java/com/omer/ailekonum2/MainActivity.java
-          grep -q 'versionName.*2.1.0' aile_konum_v2/app/build.gradle
+          grep -q 'android.permission.ACCESS_NOTIFICATION_POLICY' aile_konum_v2/app/src/main/AndroidManifest.xml
+          grep -q 'versionCode 3' aile_konum_v2/app/build.gradle
+          grep -q 'versionName.*2.1.1' aile_konum_v2/app/build.gradle
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -46,7 +48,7 @@ jobs:
       - name: Upload test APK (debug signature; NOT compatible with signed v2.0)
         uses: actions/upload-artifact@v4
         with:
-          name: AileKonum2-1-TEST-debug
+          name: AileKonum2-1-1-TEST-debug
           path: aile_konum_v2/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
           if-no-files-found: error
@@ -58,7 +60,7 @@ jobs:
       - name: Upload unsigned release for signing with original PRIVATE key (never upload key)
         uses: actions/upload-artifact@v4
         with:
-          name: AileKonum2-1-unsigned-release-toolkit
+          name: AileKonum2-1-1-unsigned-release-toolkit
           path: release-toolkit/*
           retention-days: 14
           if-no-files-found: error
