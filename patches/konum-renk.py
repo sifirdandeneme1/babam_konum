@@ -38,3 +38,22 @@ replace_once(
 )
 p.write_text(s, encoding='utf-8')
 print('Yeşil/güncel, kırmızı/eski ve turuncu/bekleniyor durumu hazır.')
+
+
+# 2.1.1 fix: Android 6+ notification-policy access must be declared in
+# AndroidManifest.xml for the app to appear in Do Not Disturb access settings.
+manifest = Path('aile_konum_v2/app/src/main/AndroidManifest.xml')
+ms = manifest.read_text(encoding='utf-8')
+old_perm = '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />'
+new_perm = old_perm + '\n    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />'
+if ms.count(old_perm) != 1 or "android.permission.ACCESS_NOTIFICATION_POLICY" in ms:
+    raise RuntimeError('Ses izin manifesti beklenmedik; kaynakları kontrol edin')
+manifest.write_text(ms.replace(old_perm, new_perm), encoding='utf-8')
+
+gradle = Path('aile_konum_v2/app/build.gradle')
+gs = gradle.read_text(encoding='utf-8')
+if gs.count('versionCode 2') != 1 or gs.count("versionName '2.1.0'") != 1:
+    raise RuntimeError('Versiyon sayıları beklenen biçimde değil')
+gs = gs.replace('versionCode 2', 'versionCode 3').replace("versionName '2.1.0'", "versionName '2.1.1'")
+gradle.write_text(gs, encoding='utf-8')
+print('v2.1.1: Rahatsız Etmeyin erişimi için manifest izni eklendi; sürüm yükseltildi.')
