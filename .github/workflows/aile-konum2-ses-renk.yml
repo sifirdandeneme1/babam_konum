@@ -31,11 +31,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Prepare Android 35
-        uses: android-actions/setup-android@v3
-      - name: Install Android SDK
+      - name: Use preinstalled Android SDK
         run: |
-          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/sdkmanager' | sort -V | tail -n 1)
+          "$SDKMANAGER" --install 'platforms;android-35' 'build-tools;35.0.0'
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
