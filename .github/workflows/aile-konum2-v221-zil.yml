@@ -1,0 +1,59 @@
+name: Aile Konum 2.2.1 - Zil Duzeltmesi
+on:
+  push:
+    branches: [fix/aile-konum2-v221-zil]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original v2 source
+        run: echo '8ccf9d3939ec9ed0432201ff9f31c1368296aae70c90ed20a789994c66b7232e  aile-konum2-source.zip' | sha256sum -c -
+      - name: Unpack unchanged v2.2 and sound-only fix
+        run: |
+          unzip -q aile-konum2-source.zip
+          base64 -d patches/aile-konum2-v22-overlay.b64 > /tmp/v22.zip
+          echo '20f984b49344b53e3351b4d8d0aa0b2eed271a7438ea139adc8a32f3f4eea0bb  /tmp/v22.zip' | sha256sum -c -
+          unzip -oq /tmp/v22.zip
+          base64 -d patches/aile-konum2-v221-zil-overlay.b64 > /tmp/v221.zip
+          echo '5c6625f517f139365c8fc6521d7cc680bdee6394164ba899a010ccd14f059399  /tmp/v221.zip' | sha256sum -c -
+          unzip -oq /tmp/v221.zip
+      - name: Verify isolated changes
+        run: |
+          grep -q 'versionCode 5' aile_konum_v2/app/build.gradle
+          grep -q "versionName '2.2.1'" aile_konum_v2/app/build.gradle
+          grep -q 'RingtoneManager.getRingtone' aile_konum_v2/app/src/main/java/com/omer/ailekonum2/SoundControl.java
+          grep -q 'AudioTrack' aile_konum_v2/app/src/main/java/com/omer/ailekonum2/SoundControl.java
+          grep -q 'VibrationEffect.createWaveform' aile_konum_v2/app/src/main/java/com/omer/ailekonum2/SoundControl.java
+          grep -q 'private void openFullscreen()' aile_konum_v2/app/src/main/java/com/omer/ailekonum2/MainActivity.java
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Use Android SDK
+        run: |
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/sdkmanager' | sort -V | tail -n 1)
+          "$SDKMANAGER" --install 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compile
+        working-directory: aile_konum_v2
+        run: gradle --no-daemon assembleDebug assembleRelease
+      - name: Release toolkit (no private key)
+        run: |
+          mkdir -p release-toolkit
+          cp aile_konum_v2/app/build/outputs/apk/release/app-release-unsigned.apk release-toolkit/
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" release-toolkit/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AileKonum2-v221-unsigned-signing-toolkit
+          path: release-toolkit/*
+          retention-days: 14
+          if-no-files-found: error
